@@ -1,0 +1,54 @@
+@startuml
+skinparam state {
+  BackgroundColor #F8F9FA
+  BorderColor #2563EB
+  ArrowColor #333333
+}
+
+
+[*] --> INITIALISING : Instantiate / AudioVisualizer(target_function)
+
+state INITIALISING {
+  [*] --> PreparingData
+
+  PreparingData : entry / _prepare_data()
+  note right of PreparingData : Maps x to f(x)\nCleans NaNs and asymptotes
+  
+  PreparingData --> GeneratingAudio
+  
+  GeneratingAudio : entry / _generate_audio_sequence()
+  note right of GeneratingAudio : Normalizes frequencies\nGenerates audio waves
+  
+  GeneratingAudio --> SettingUpPlot
+  
+  SettingUpPlot : entry / _setup_plot()
+  note right of SettingUpPlot : Configures matplotlib UI\nBinds close_event
+  
+  SettingUpPlot --> [*]
+}
+
+
+INITIALISING --> READY
+
+
+READY --> ANIMATING : play() / Start FuncAnimation
+
+state ANIMATING {
+  [*] --> PendingFirstFrame
+  
+  PendingFirstFrame --> PlaybackAndSync : update [audio_started == False] / sd.play(), record start_time, audio_started = True
+  
+  PlaybackAndSync --> PlaybackAndSync : update [current_index < len(x_clean)] / calculate elapsed time, update point
+  
+  PlaybackAndSync --> SequenceComplete : update [current_index >= len(x_clean)] / clamp to last index
+  
+  SequenceComplete --> SequenceComplete : update / hold point position
+}
+
+
+ANIMATING --> [*] : close_event / sd.stop()
+
+
+READY --> [*] : close_event / sd.stop()
+
+@enduml
