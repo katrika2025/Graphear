@@ -1,62 +1,63 @@
 @startuml
 skinparam state {
-  BackgroundColor #ffffff
+  BackgroundColor #F8F9FA
   BorderColor #2563EB
   ArrowColor #333333
 }
 
-[*] --> INITIALISING : Instantiate / AudioVisualizer(target_function)
+[*] --> INITIALIZING : Instantiate / AudioVisualizer(target_function)
 
-state INITIALISING {
-  [*] --> PreparingData
-
-  PreparingData : entry / _prepare_data()
-  note right of PreparingData : Samples x values\nRuns _evaluate_target_function()\nBuilds vertical line mode if needed\nCleans NaNs and asymptotes\nCreates safe fallback if no valid points remain
-
-  PreparingData --> ValidationError : invalid shape, invalid vertical line, or other unexpected evaluation error
-  PreparingData --> GeneratingAudio : valid data or safe fallback
+state INITIALIZING {
+  [*] --> EvaluatingData
+  
+  EvaluatingData : entry / _evaluate_target_function(), _validate_y_values()
+  
+  EvaluatingData --> CleaningData : [Evaluation successful]
+  EvaluatingData --> ErrorFallback : [Exception OR Validation failed]
+  
+  CleaningData : entry / Filter NaNs and asymptotes
+  
+  CleaningData --> GeneratingAudio : [x_clean.size > 0]
+  CleaningData --> ErrorFallback : [x_clean.size == 0]
+  
+  ErrorFallback : entry / _use_no_plot_fallback()
+  note right of ErrorFallback : Safely catches errors,\nsets has_plot_data = False,\nprovides safe dummy data
+  
+  ErrorFallback --> GeneratingAudio : [Fallback applied]
   
   GeneratingAudio : entry / _generate_audio_sequence()
-  note right of GeneratingAudio : Normalizes y into frequencies\nGenerates one smooth centered stereo signal\nCan produce empty or fallback-safe audio
+  note right of GeneratingAudio : Normalizes frequencies,\nsynthesizes stereo audio
   
-  GeneratingAudio --> SettingUpPlot
+  GeneratingAudio --> SettingUpPlot : [Audio sequence generated]
   
   SettingUpPlot : entry / _setup_plot()
-  note right of SettingUpPlot : Configures matplotlib UI\nShows fallback message if no valid graph points exist\nBinds close_event
+  note right of SettingUpPlot : Configures matplotlib UI,\nbinds close_event
   
   SettingUpPlot --> [*]
-
-  state ValidationError
-  ValidationError : entry / raise ValueError
-  ValidationError --> [*]
 }
 
+INITIALIZING --> READY : [Initialization complete]
 
-' INITIALISING -right-> READY
-INITIALISING --> READY
-
-
-' READY -right-> ANIMATING : play() / Start FuncAnimation
 READY --> ANIMATING : play() / Start FuncAnimation
 
 state ANIMATING {
-  [*] --> PendingFirstFrame
-
-  PendingFirstFrame --> NoPlotData : update [has_plot_data == False] / return without audio or point movement
-  PendingFirstFrame --> PlaybackAndSync : update [audio_started == False] / sd.play(), record start_time, audio_started = True
+  [*] --> EvaluatingDataState
   
-  PlaybackAndSync --> PlaybackAndSync : update [current_index < len(x_clean)] / calculate elapsed time, update point
+  EvaluatingDataState --> NoDataIdle : [has_plot_data == False]
+  EvaluatingDataState --> PendingFirstFrame : [has_plot_data == True]
   
-  PlaybackAndSync --> SequenceComplete : update [current_index >= len(x_clean)] / clamp to last index
-
-  NoPlotData --> NoPlotData : update / keep fallback message visible
+  NoDataIdle --> NoDataIdle : update / return empty point
+  
+  PendingFirstFrame --> PlaybackAndSync : update [audio_started == False] / sd.play(), record latency & time, audio_started = True
+  
+  PlaybackAndSync --> PlaybackAndSync : update [current_index < len(x_clean)] / calculate elapsed time, update point position
+  
+  PlaybackAndSync --> SequenceComplete : update [current_index >= len(x_clean)] / clamp index, update point position
+  
   SequenceComplete --> SequenceComplete : update / hold point position
 }
 
-
-ANIMATING --> [*] : close_event / sd.stop()
-
-
-READY --> [*] : close_event / sd.stop()
+ANIMATING --> [*] : close_event / sd.stop(), Terminate Process
+READY --> [*] : close_event / sd.stop(), Terminate Process
 
 @enduml
