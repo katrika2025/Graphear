@@ -177,7 +177,7 @@ In this code, we normalize the clean `y` values into a frequency range of 150 Hz
 
 ### `normalize(arr, new_min, new_max)`
 
-Since we are technically mapping an old range into a new range, we use a mathematical algorithm known as [Min-Max Normalization (or Linear Interpolation/Scaling)](https://apxml.com/courses/intro-feature-engineering/chapter-4-feature-scaling-transformation/normalization-scaling).
+Since we are technically mapping an old range into a new range, we use a mathematical algorithm known as [Min-Max Normalization](https://apxml.com/courses/intro-feature-engineering/chapter-4-feature-scaling-transformation/normalization-scaling).
 
 It also includes a crucial safety check: if `arr_max` and `arr_min` are the exact same number (meaning your graph is just a straight horizontal line), `arr_max - arr_min` equals 0. If you didn't have this `if` statement to handle the flatline, the formula below it would try to divide by zero, which would instantly crash your entire program.
 
@@ -185,9 +185,21 @@ It also includes a crucial safety check: if `arr_max` and `arr_min` are the exac
 
 This method creates the full audio signal from the frequencies.
 
-First, it spreads the frequencies smoothly across the whole sound timeline.
+First, it spreads the frequencies smoothly across the whole sound timeline using Linear Interpolation:
 
-Then, it builds one continuous sine wave and applies a fade-in and fade-out envelope so the sound starts and ends smoothly.
+> ![Linear Interpolation](Linear_Interpolation.png) 
+
+
+Then, it builds one continuous sine wave using the following concepts:
+> ![Phase](Phase.png)
+
+> ![Sine Wave](Sine_Wave.png)
+
+
+Then, it applies a fade-in and fade-out envelope so the sound starts and ends smoothly.
+
+> ![Linear Env](Linear_Env.png)
+
 
 The result is one stereo NumPy array with the same sound sent to both ears, and it can be played by `sounddevice`.
 
