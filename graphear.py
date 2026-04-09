@@ -105,7 +105,6 @@ class AudioVisualizer:
 
     def _prepare_data(self):
         """Sample the function, validate it, and keep only plottable graph points."""
-
         default_x = np.linspace(-15, 15, 2000)  # Create the default x-range for the graph.
         try:
             result = self._evaluate_target_function(default_x) 
@@ -237,7 +236,7 @@ def target_function(x):
     # Desmos: https://www.desmos.com/calculator/lzc5jdirrq
 
     # return np.full_like(x, 0 / 0)  # invalid values on purpose
-    # return np.sin(x**2)  # WOWOWOWOW
+    return np.sin(x**2)  # WOWOWOWOW
     # return np.sin(x)  # sine-wave function.
     # return np.e**x  # exponential curve
     # return np.log10(x)    #  logarithmic curve
@@ -245,7 +244,7 @@ def target_function(x):
     # return np.floor(x * 2)    # step pattern
     # return np.sign(np.sin(4 * x))    # square-wave-like pattern
     # return np.full_like(x, 3.0)    # flat horizontal line
-    return ("vertical", np.log10(-4))  # vertical line request
+    # return ("vertical", np.log10(-4))  # vertical line request
     # return np.full_like(x, np.log10(-5))
     # return 2 * x    # straight sloped line
     # return np.tan(x)    # tangent curve with asymptotes
