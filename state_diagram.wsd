@@ -10,35 +10,35 @@ skinparam state {
 state INITIALIZING {
   [*] --> EvaluatingData
   
-  EvaluatingData : entry / _evaluate_target_function(), _validate_y_values()
+  EvaluatingData :_evaluate_target_function(), _validate_y_values()
   
   EvaluatingData --> CleaningData : [Evaluation successful]
-  EvaluatingData --> ErrorFallback : [Exception OR Validation failed]
+  EvaluatingData --> ErrorFallback : [Evaluation failed]
   
-  CleaningData : entry / Filter NaNs and asymptotes
+  CleaningData : Filter NaNs and asymptotes / _prepare_data(self)
   
   CleaningData --> GeneratingAudio : [x_clean.size > 0]
   CleaningData --> ErrorFallback : [x_clean.size == 0]
   
-  ErrorFallback : entry / _use_no_plot_fallback()
+  ErrorFallback : _use_no_plot_fallback()
   note right of ErrorFallback : Safely catches errors,\nsets has_plot_data = False,\nprovides safe dummy data
   
-  ErrorFallback --> GeneratingAudio : [Fallback applied]
+  ErrorFallback --> GeneratingAudio 
   
-  GeneratingAudio : entry / _generate_audio_sequence()
+  GeneratingAudio : _generate_audio_sequence()
   note right of GeneratingAudio : Normalizes frequencies,\nsynthesizes stereo audio
   
-  GeneratingAudio --> SettingUpPlot : [Audio sequence generated]
+  GeneratingAudio --> SettingUpPlot 
   
-  SettingUpPlot : entry / _setup_plot()
+  SettingUpPlot : _setup_plot()
   note right of SettingUpPlot : Configures matplotlib UI,\nbinds close_event
   
   SettingUpPlot --> [*]
 }
 
-INITIALIZING --> READY : [Initialization complete]
+INITIALIZING --> READY 
 
-READY --> ANIMATING : play() / Start FuncAnimation
+READY --> ANIMATING : Animating with FuncAnimation / play()
 
 state ANIMATING {
   [*] --> EvaluatingDataState

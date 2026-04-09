@@ -236,8 +236,8 @@ def target_function(x):
     # Desmos: https://www.desmos.com/calculator/lzc5jdirrq
 
     # return np.full_like(x, 0 / 0)  # invalid values on purpose
-    return np.sin(x**2)  # WOWOWOWOW
-    # return np.sin(x)  # sine-wave function.
+    # return np.sin(x**2)  # WOWOWOWOW
+    return np.sin(x)  # sine-wave function.
     # return np.e**x  # exponential curve
     # return np.log10(x)    #  logarithmic curve
     # return -(x % 1.5)    #  repeating ramp pattern
