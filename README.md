@@ -212,7 +212,15 @@ In this code, we normalize the clean `y` values into a frequency range of 150 Hz
 
 ### `normalize(arr, new_min, new_max)`
 
-Since we are technically mapping an old range into a new range, we use a mathematical algorithm known as [Min-Max Normalization](https://apxml.com/courses/intro-feature-engineering/chapter-4-feature-scaling-transformation/normalization-scaling).
+Since we are technically mapping an old range into a new range, we use a mathematical algorithm known as [Min-Max Normalization](https://apxml.com/courses/intro-feature-engineering/chapter-4-feature-scaling-transformation/normalization-scaling) to scale a range to an arbitrary range [a,b]:
+
+> $$ X_{\text{scaled}} = a + \frac{(X - X_{\min})(b - a)}{X_{\max} - X_{\min}} $$
+> 
+> - $X$ is the original feature value.
+> 
+> - $X_{\min}$ is the minimum value observed for that feature in the training data.
+> 
+> - $X_{\max}$ is the maximum value observed for that feature in the training data.
 
 It also includes a crucial safety check: if `arr_max` and `arr_min` are the exact same number (meaning your graph is just a straight horizontal line), `arr_max - arr_min` equals 0. If you didn't have this `if` statement to handle the flatline, the formula below it would try to divide by zero, which would instantly crash your entire program.
 

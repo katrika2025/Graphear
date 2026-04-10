@@ -235,24 +235,30 @@ def target_function(x):
     """Input the graph formula to visualize and sonify."""
     # Desmos: https://www.desmos.com/calculator/lzc5jdirrq
 
-    # return np.full_like(x, 0 / 0)  # invalid values on purpose
-    # return np.sin(x**2)  # WOWOWOWOW
-    return np.sin(x)  # sine-wave function.
-    # return np.e**x  # exponential curve
-    # return np.log10(x)    #  logarithmic curve
-    # return -(x % 1.5)    #  repeating ramp pattern
-    # return np.floor(x * 2)    # step pattern
-    # return np.sign(np.sin(4 * x))    # square-wave-like pattern
-    # return np.full_like(x, 3.0)    # flat horizontal line
-    # return ("vertical", np.log10(-4))  # vertical line request
-    # return np.full_like(x, np.log10(-5))
-    # return 2 * x    # straight sloped line
+    # return np.full_like(x, 0 / 0)  # invalid values
+    # return np.full_like(x, np.nan) # >10
+    # return np.full_like(x, 3.0)    # worked flat horizontal line
+
+    # return ("vertical", np.log10(-4))  # invalid vertical line
+    # return ("vertical", np.log10(4))  # worked vertical line
+
+    # return np.array([1.0, 2.0, 3.0]) # wrong shape
+
+    # return np.sin(x)  # default sine-wave.
     # return np.tan(x)    # tangent curve with asymptotes
     # return np.sin(15 * x) * np.exp(-np.abs(x))    # damped fast wave
     # return np.sin(x) * np.sin(x**2)    # layered oscillating pattern
     # return np.sin(15 * x) * np.cos(x) * x / 5    # mixed modulated wave
     # return np.where(x == 0, 0, np.sin(1 / x)) # curve that changes rapidly near zero
     # return np.where(np.abs(x) < 1, np.nan, np.sin(x)) # NaN in the center region
+
+    # return np.e**x  # exponential curve
+    # return -(x % 1.5)    #  repeating ramp pattern
+
+    # return np.sin(x**2)  # WOWOWOWOW
+    # return 2 * x    # straight sloped line
+    # return np.floor(x * 2)    # step pattern
+    # return np.sign(np.sin(4 * x))    # square-wave-like pattern
 
 
 result = AudioVisualizer(target_function)
