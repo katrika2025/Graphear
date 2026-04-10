@@ -5,9 +5,12 @@ Graphear is a small Python application that allows you to hear 2D graphs. The pr
 ## Features
 
 - Synchronizes sound playback with an animated point on the graph
-- Handles problematic values such as `NaN`, `0/0`, and large asymptote spikes
-- Supports normal functions, horizontal lines, and a simple vertical line mode
-- Keeps the program running when a function produces only undefined values by showing a safe fallback screen
+- Smooths sound transitions using continuous phase accumulation to avoid clicking artifacts
+- Interpolates frequencies so the sound changes gradually instead of jumping between values
+- Handles problematic values such as `NaN`, `0/0`, shape mismatches, and large asymptote spikes
+- Supports normal 2D functions, horizontal lines, and simple vertical lines
+- Keeps the program running when a function produces no valid data by showing a fallback screen instead of crashing
+- Uses actual audio stream timing (including latency) to keep the animation and sound in sync
 
 ## Main Dependencies
 
@@ -53,8 +56,15 @@ Make sure the 2 files, `requirements.txt` and `graphear.py`, are in the same dir
 Choose one of the built-in 2D mathematical functions or insert your own:
 ```python
 def target_function(x):
-    return np.sin(x**2)
+    return np.sin(x)
     ...
+```
+
+You can replace this with other functions to create different visual and audio patterns. For instance, you can use NumPy's `where` function to create conditions:
+
+```python
+# Creates a gap in the center
+return np.where(np.abs(x) < 1, np.nan, np.sin(x))
 ```
 
 You can also test a vertical line with:
@@ -72,30 +82,51 @@ py graphear.py
 
 When the window opens, the graph will appear and the generated sound will begin when the animation starts.
 
-## Input Validation And Error Handling
-
-Graphear has an explicit validation path so different kinds of bad input are handled in different ways:
-
-- If the function raises a direct `ZeroDivisionError` such as `return np.full_like(x, 0 / 0)`, the program converts that into an all-`NaN` result instead of crashing immediately.
-- If the function returns values with the wrong shape, the program raises a `ValueError` because the graph needs one `y` value for each sampled `x` value.
-- If the function returns a vertical line tuple like `("vertical", 3)`, the program builds a vertical line instead of a normal `y = f(x)` graph.
-- If every point becomes invalid after evaluation and cleanup, the program stays open, shows a message in the plot window, and skips animation/audio playback for that run.
-- If the vertical line position is not finite, or if the function raises some other unexpected error, the program raises a `ValueError` with a clear message.
-
 ## How The Program Works
 
 In simple terms, Graphear works like this:
 
 1. `target_function(x)` Read a mathematical function.
-2. `_evaluate_target_function(self, x_values)` Run the function and catch direct arithmetic failures such as `0/0`.
-3. `_prepare_data(self)` Sample many points from that function and clean the result.
-4. `_validate_y_values(self, y_values)` Check whether the returned data is shaped correctly and usable.
-5. `normalize(arr, new_min, new_max)` Scale the clean graph values into a frequency range.
-6. `generate_audio(freqs, sample_rate, duration)` Convert the function values into one smooth audio signal.
-7. `_generate_audio_sequence(self)` Build one long audio signal.
-8. `_setup_plot(self)` Draw the graph or show a fallback message when no valid points exist.
+
+2. `_evaluate_target_function(self, x_values)` Run the function safely and handle direct errors.
+
+3. `_validate_y_values(self, y_values)` Ensure the function returns one value per input.
+
+4. `_prepare_data(self)` Sample points, validate the output, handle vertical lines, and remove invalid values.
+
+5. `_use_no_plot_fallback(self, x_values)` Safely halt calculation and prep an error screen if the data is totally unusable.
+
+5. `normalize(arr, new_min, new_max)` Scale the clean values into a usable frequency range.
+
+6. `generate_audio(freqs, sample_rate, duration)` Convert cleaned graph values into frequencies.
+
+7. `_generate_audio_sequence(self)` Build one smooth audio signal from those frequencies.
+
+8. `_setup_plot(self)` Draw the graph or show a fallback message if no valid data exists.
+
 9. `play(self)` Start playback.
-10. `update(self, frame)` Move a point along the curve so the user can both see and hear the function at the same time.
+
+10. `update(self, frame)` Move the point based on real audio playback timing.
+
+## Input Validation And Error Handling
+
+Graphear has an explicit validation path so different kinds of bad input are handled in different ways:
+
+* If the function raises a direct arithmetic error (such as `0/0`), `_evaluate_target_function()` catches it and returns an array of `NaN` values instead of crashing the program.
+
+* If the function returns values with the wrong shape (not one `y` value per `x`), `_validate_y_values()` raises a `ValueError` to prevent mismatched graph and audio data.
+
+* If the function returns a vertical line tuple like `("vertical", value)`, the program builds a vertical line instead of a normal `y = f(x)` graph.
+
+* If the vertical line position is not a finite number, the program switches to a safe fallback state instead of attempting to plot invalid data.
+
+* After evaluation, very large values (such as asymptote spikes) are replaced with `NaN` so they are not plotted or converted into sound.
+
+* If every point becomes invalid after cleanup, `_use_no_plot_fallback()` is activated. The program stays open, displays a message, and avoids generating misleading audio.
+
+* If the function raises any other unexpected error during evaluation, the program treats it as invalid input and falls back safely instead of crashing.
+
+* If no valid frequencies are produced, the audio generation step returns an empty (silent) audio array instead of failing.
 
 ## State Machine Diagram
 
@@ -108,7 +139,7 @@ In simple terms, Graphear works like this:
 This is the mathematical function the program will visualize and sonify. The default is:
 
 ```python
-return np.sin(x**2)
+return np.sin(x)
 ```
 
 You can replace this with other functions to create different visual and audio patterns.
@@ -145,7 +176,7 @@ Next, we eliminate outliers (like asymptote spikes). We find any `y` elements wi
 
 Finally, we filter out these `NaN` values by moving the valid numbers to a clean, new array for audio mapping.
 
-If every point becomes invalid, the program creates a safe fallback version so it can still run. In that case, it marks that there is no real plot data, shows a message on the graph, and avoids trying to animate or play meaningful audio from invalid points.
+If every point becomes invalid at any point during this process, the program calls `_use_no_plot_fallback()` to switch into the safe state.
 
 ### `_evaluate_target_function()`
 
@@ -157,17 +188,21 @@ If the function contains a direct arithmetic error like:
 return np.full_like(x, 0 / 0)
 ```
 
-Python raises `ZeroDivisionError` before `np.full_like()` can finish. Graphear now catches that exact error and returns an array of `np.nan` values instead.
-
-If some other unexpected error happens, the method raises a cleaner `ValueError` so the program reports a more understandable problem.
+Graphear catches that general `Exception` before the program crashes and returns an array of np.nan values instead.
 
 ### `_validate_y_values()`
 
 This method checks whether the function output can be treated as graph data.
 
-- If the output shape is wrong, it raises an error.
+- If the output shape is wrong, it raises an `ValueError`.
 - If the output is fully undefined (`NaN` or infinity everywhere), it passes that result forward so `_prepare_data()` can switch into the safe fallback path instead of crashing immediately.
 - If the output is usable, it returns the numeric array normally.
+
+### `_use_no_plot_fallback(self, x_values)`
+
+This method sets a safe fallback state when the input function fails to produce any usable graph data (for instance, if the function returns only `NaN` values or causes a shape mismatch).
+
+Instead of crashing, it sets `has_plot_data = False`, fills the `y` array with `NaN`s to prevent plotting, and sets safe default coordinates for the animation point. This allows the program's window to open normally and display a helpful "No valid graph points" message to the user, without attempting to play audio or animate a non-existent curve.
 
 ### `_generate_audio_sequence()`
 
@@ -185,21 +220,64 @@ It also includes a crucial safety check: if `arr_max` and `arr_min` are the exac
 
 This method creates the full audio signal from the frequencies.
 
-First, it spreads the frequencies smoothly across the whole sound timeline using Linear Interpolation:
+First, it spreads the frequencies smoothly across the whole sound timeline:
 
-> ![Linear Interpolation](Linear_Interpolation.png) 
+```python
+source_positions = np.arange(len(freqs))
+target_positions = np.linspace(0, len(freqs) - 1, total_samples)
+smooth_freqs = np.interp(target_positions, source_positions, freqs)
+``` 
 
+This basically uses [Linear Interpolation](https://web1.eng.famu.fsu.edu/~dommelen/courses/eml3100/aids/intpol/) to estimate values between 2 known points:
 
-Then, it builds one continuous sine wave using the following concepts:
-> ![Phase](Phase.png)
+> For a time $t$ falling between two original indices $i$ and $i+1$, the interpolated frequency $f(t)$ is:$$f(t) = f_i + (t - i) \cdot \frac{f_{i+1} - f_i}{(i+1) - i}$$
+>
+> * $f_i$: The frequency at the starting known point.
+>
+>* $(t - i)$: How far we have moved into the gap between the two points.
+>
+>* $\frac{f_{i+1} - f_i}{(i+1) - i}$: The Slope (Rate of Change). In Graphear, the denominator is $1$ because `source_positions` increments by 1.
 
-> ![Sine Wave](Sine_Wave.png)
+Then, it builds one [continuous sine wave](https://mathematicalmysteries.org/sine-wave/):
 
+``` python
+phase = (2 * np.pi * np.cumsum(smooth_freqs) / sample_rate)
+wave = 0.2 * np.sin(phase)
+```
 
-Then, it applies a fade-in and fade-out envelope so the sound starts and ends smoothly.
+using these following formulas:
+> $$\Phi_n = \frac{2\pi}{f_s} \sum_{k=0}^{n} f_k$$
+>
+> * $2\pi$: Converts "rotations" into Radians. One full wave cycle is $2\pi$ radians.
+>
+> * $\sum_{k=0}^{n} f_k$ (np.cumsum): This is the Accumulated Frequency. It tracks the "total distance" the wave has traveled. Without this, the wave would "reset" every time the frequency changes, causing loud popping noises.
+>
+> * $f_s$ (sample_rate): Normalizes the calculation so it accounts for time (44,100 samples = 1 second).
 
-> ![Linear Env](Linear_Env.png)
+and 
 
+> $$y(t) = A \cdot \sin(\Phi_t)$$
+> * $A$ (0.2): The Amplitude. This controls the volume. $1.0$ is the maximum volume; $0.2$ is a safe, comfortable level.
+>
+> * $\sin$: The function that converts the accumulated phase into a smooth oscillation between $-1$ and $1$.
+
+![Sine wave](animated-sinewave.webp)
+
+After that, it applies a fade-in and fade-out envelope so the sound starts and ends smoothly.
+
+```python
+fade[:edge_size] = np.linspace(0, 1, edge_size)  # Fade in
+fade[-edge_size:] = np.linspace(1, 0, edge_size) # Fade out
+wave = wave * fade
+```
+using Linear Envelope concept:
+
+> $$y_{final}(t) = y_{wave}(t) \times E(t)$$
+>
+> * $E(t)$: The envelope value.
+>
+>   * At the start: It goes from $0.0 \to 1.0$ so the sound starts at silence and grows.
+>   * At the end: It goes from $1.0 \to 0.0$ so the sound "fades" to silence.
 
 The result is one stereo NumPy array with the same sound sent to both ears, and it can be played by `sounddevice`.
 
